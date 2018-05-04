@@ -1,0 +1,139 @@
+it2snvgm: IT module to SN76489 (Sega Master System) VGM converter
+
+This is a utility to convert ImpulseTracker .IT modules to VGM files targeting 
+the SN76489 chip used in the Sega Master System and various other platforms. It 
+was developed as an alternative to existing proprietary trackers targeting this 
+chip and, while not as nice or easy to use as a purpose-built tracker, it should 
+get the job done.
+
+This initial release was developed rather hastily and is a bit rough around the 
+edges, but generally supports the features it needs to.
+
+********************************************************************************
+*                                  Building                                    *
+********************************************************************************
+
+Users of Unix-like systems can build as follows:
+
+$ cd it2snvgm
+$ make
+
+Windows users are on their own, as I haven't bothered to build for that platform 
+or set up a Visual Studio project. blackt and libsvgm should be built as static 
+libraries, with it2snvgm linking in both.
+
+To convert an IT file:
+$ ./it2snvgm infile.it outfile.vgm
+
+********************************************************************************
+*                                 How to Use                                   *
+********************************************************************************
+
+Input IT files need to be specially designed for the limits of the sound 
+hardware, so don't expect to be able to just plug in any old module you have 
+laying around and get listenable results.
+
+Channels in the IT file are mapped directly to hardware channels as follows:
+
+IT channels 1, 5, 9, ...    = tone channel 0
+IT channels 2, 6, 10, ...   = tone channel 1
+IT channels 3, 7, 11, ...   = tone channel 2
+IT channels 4, 8, 12, ...   = noise channel
+
+Lower-numbered IT channels have a higher priority than higher-numbered ones. 
+Channels with lower priority will play only if all channels with a higher 
+priority are silent. For example, if two different notes are playing 
+simultaneously on channel 1 and channel 5, the note on channel 1 will be output 
+to tone channel 0. However, if the note on channel 1 stops, the note on channel 
+5 will be heard instead. This can be useful e.g. for setting up delay channels 
+without having to intermix them with another channel.
+
+it2snvgm is very simple. It doesn't know or care about your samples (in fact, it 
+doesn't even load them from the file), nor does it care how you've mapped them 
+to instruments. All it cares about are what notes you've entered into your 
+patterns and how they're being modified by effects/envelopes.
+
+* For tone channels, a note of A0 in the IT file outputs a note of A2 in the 
+VGM, A#0 corresponds to A#2, etc., in order to maximize the accessible part of 
+the tone range.
+* For the noise channel:
+  * Notes C0-B0 = low-frequency noise
+  * Notes C1-B1 = mid-frequency noise
+  * Notes C2-B2 = high-frequency noise
+  * Notes C3+   = tone2-frequency noise
+* In "periodic noise" mode (see below), a note of A0 corresponds to an output 
+note of A-2 (i.e. four octaves below the normal tone range).
+
+Your samples/instrument maps should be configured to match this arrangement.
+
+it2snvgm does not care about tempo, only speed -- consoles have fixed frame 
+refresh periods, and this program will not interpolate for you. Your IT should 
+have a tempo of 150 (or some lower value for PAL consoles) and control playback 
+speed solely through Axx commands.
+
+Finally, note that your files must use "modern" IT settings -- legacy modes are 
+not supported. Specifically:
+  * "Linear frequency slides" should be enabled.
+  * "Old effects" and "compatible Gxx" should be disabled.
+Unless you're using a very old tracker, these should be the default settings 
+anyway.
+
+********************************************************************************
+*                              Feature Support                                 *
+********************************************************************************
+
+Most features of the IT format that make any sense to represent on the SN76489 
+are supported by the converter, including:
+
+* Note volume and volume commands
+* Instruments, including envelopes (volume and pitch only)
+* Most common command effects
+
+Basically anything else is unsupported, including but not limited to:
+  * All panning- and filtering-related features
+  * Samples and sample effects
+  * Most of the more exotic effect commands
+
+The following effects commands are fully supported, and should behave exactly as 
+they would in an IT player:
+  * Axx
+  * Cxx
+  * Dxx/DEx/DFx
+  * Exx
+  * Fxx
+  * Gxx
+  * Hxx
+  * Ixx
+  * Jxx
+  * Mxx
+  * SCx
+  * SDx
+  * axx
+  * bxx
+  * cxx
+  * dxx
+  * exx
+  * fxx
+  * gxx
+  * vxx
+  
+These commands are only partly supported:
+  * Bxx -- Works, but may only be used to jump to an earlier order, and may not 
+be used in conjunction with Cxx to jump to a row other than the first one. If 
+this effect is used, the generated VGM will loop.
+
+Other effects will not function.
+
+Additionally, there are a few extensions used by the converter in order to 
+support "periodic noise" mode:
+  * S7D: When used in a noise channel (IT channels 4, 8, 12, ...), this 
+registers the IT channel it appears in as a "white noise" channel, and 
+subsequent notes will be output as such. This is also the default mode. Note 
+that this applies only to that specific IT channel, *not* to the noise channel 
+overall! This means you can e.g. have channel 4 configured for periodic noise 
+and channel 8 configured for white noise at the same time.
+  * S7E: Like S7D, but registers the channel as a "periodic noise" channel.
+
+Unfortunately, periodic noise mode is quite cumbersome to use right now. I hope 
+to improve this eventually.
+
